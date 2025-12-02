@@ -310,26 +310,11 @@ At VSEEP — the strongest groundwater source in this dataset — nutrient conce
 # Maps
 
 ## SGD Map
-
+SGD is spatially patchy. Nutrients and isotopes often show clear patterns along a seep–offshore gradient. A map lets us see:
+      • which sites are nutrient hotspots (e.g., VSEEP)
+      • how signals change down-gradient
+      • whether March and August differ spatially
 ```{r}
-# ============================================================
-# make_sgd_map_summary()
-# ------------------------------------------------------------
-# PURPOSE:
-#   Build an interactive leaflet map showing nutrient and isotope
-#   patterns for a single season (March or August). This map lets
-#   us visually assess how groundwater-driven nutrient enrichment
-#   varies in *space* across the sampling gradient.
-#
-# WHY THIS MATTERS (FOR YOUR PRESENTATION):
-#   SGD is spatially patchy. Nutrients and isotopes often show
-#   clear patterns along a seep–offshore gradient. A map lets us
-#   see:
-#      • which sites are nutrient hotspots (e.g., VSEEP)
-#      • how signals change down-gradient
-#      • whether March and August differ spatially
-#   This map is one of your “storytelling” outputs.
-#
 # INPUTS:
 #   df_summary  - the output list from summarize_master()
 #                 We use the $wide table (one row per site per tide per season).
@@ -341,72 +326,23 @@ At VSEEP — the strongest groundwater source in this dataset — nutrient conce
 #     • δ15N
 #     • δ13C
 #     • Site labels
-#
-# NOTES ON GOOGLE SATELLITE:
-#   - Google tiles require an API key.
-#   - You set the key in your R session (NOT in code), so it is private.
-#   - When the map is knitted to HTML, the tiles load from the embedded URL.
-#   - The key will be visible in the HTML, so DO NOT commit the HTML to GitHub.
-# ============================================================
-
 make_sgd_map_summary <- function(df_summary, season = "March") {
 
-  # ---- Load required libraries ----
-  library(dplyr)
-  library(leaflet)
-  library(RColorBrewer)
-
-  # ============================================================
-  # 1. EXTRACT AND FILTER DATA
-  # ------------------------------------------------------------
-  # summarize_master() returns a list with
-  #   • $wide  (wide-format table)
-  #   • $long  (long-format table)
-  #
-  # Here we only need the wide version because:
-  #   • Each row is already 1 site × 1 tide × 1 season,
-  #   • All nutrient/isotope variables are columns.
-  # ============================================================
+  # 1. summarize_master() returns a list with a wide-format table
+  #     -Each row is already 1 site × 1 tide × 1 season,
+  #     -All nutrient/isotope variables are columns.
 
   df <- df_summary$wide
   df_season <- df %>% filter(Season == season)
 
   # ============================================================
-  # 2. CREATE COLOR PALETTES
-  # ------------------------------------------------------------
-  # WHY?
-  #   Each nutrient and isotope is continuous and requires a
-  #   gradient color scale. Using palettes that reinforce the
-  #   scientific meaning helps communicate the signal:
-  #     • BuPu  = “cool to warm” for nutrients
-  #     • YlOrRd = typical for heavy isotope enrichment
-  #     • Blues  = δ13C fingerprints (light → darker C values)
-  #
-  # HOW DOMAINS ARE CHOSEN:
-  #   Here we simply use the min/max from this season’s dataset.
-  #   (More complex maps sometimes scale excluding extreme seeps.)
-  # ============================================================
-# ============================================================
-# UPDATED COLOR PALETTES (flipped correctly)
-# ------------------------------------------------------------
-# δ15N:
-#   Lowest values = pale yellow
-#   Highest values = deep red
-#
-# δ13C:
-#   Values are negative; closer to -8 should be pale/white,
-#   and -16 should be dark blue.
-#
-# IMPORTANT:
-#   - For δ15N we reverse the YlOrRd scale so yellow = low.
-#   - For δ13C we reverse BOTH the scale AND numerical domain
-#     so the legend goes:
-#          -8   (light)
-#          ...
-#         -16   (dark)
-# ============================================================
+  # 2. Color Pallettes
+  #   Each nutrient and isotope is continuous needing it's own gradient       color scale. 
+  #   Here I simply use the min/max from this season’s dataset
+  #   Learned that leaflet is a bit precious about it's ordering scheme so had to do a bit of forcing to get the right colors to the right values
 
-# Nutrients stay the same:
+
+# Nutrients
 pal_nut <- colorNumeric(
   brewer.pal(9, "BuPu"),
   domain = unlist(df_season %>% select(PO4, SiO2, NO3, NH4)),
@@ -416,7 +352,7 @@ pal_nut <- colorNumeric(
 # δ15N  (flip palette so yellow = low)
 pal_d15 <- colorNumeric(
   brewer.pal(9, "YlOrRd"),   # NOT reversed anymore — now correct light→dark
-  domain = df_season$del15N, # TRUE domain ensures legend goes low→high
+  domain = df_season$del15N, 
   na.color = "transparent"
 )
 
@@ -432,43 +368,21 @@ pal_d13 <- colorNumeric(
   na.color = "transparent"
 )
 
-
-  # ============================================================
-  # 3. PRECOMPUTE COLORS FOR EACH POINT
-  # ------------------------------------------------------------
-  # WHY?
-  #   Leaflet allows you to pass hex colors directly. Precomputing
-  #   them improves readability and ensures no palette mismatch.
-  #
-  #   These new columns (e.g., PO4_col) store the actual color
-  #   for each point based on its concentration.
-  # ============================================================
-
-  df_season <- df_season %>%
+ df_season <- df_season %>%
     mutate(
       PO4_col  = pal_nut(PO4),
       SiO2_col = pal_nut(SiO2),
-      NO3_col  = pal_nut(NO3),  # Your dataset uses NO3 for Nitrite
+      NO3_col  = pal_nut(NO3),
       NH4_col  = pal_nut(NH4),
       del15N_col = pal_d15(del15N),
       del13C_col = pal_d13(del13C)
     )
-
-  # ============================================================
   # 4. POPUP FUNCTION
-  # ------------------------------------------------------------
-  # WHY?
-  #   Each Marker popup gives detailed values for that point.
-  #   Domain experts (like your advisor) want exact numbers.
-  #
   #   The popup shows:
   #     • site ID
   #     • tide
   #     • all nutrient concentrations
   #     • δ15N and δ13C
-  #
-  #   This reinforces the “diagnostic dashboard” framing.
-  # ============================================================
 
   popup_fun <- function(row) {
     sprintf(
@@ -485,25 +399,12 @@ pal_d13 <- colorNumeric(
       row$del15N, row$del13C
     )
   }
-
-  # ============================================================
+  
   # 5. BASEMAP — GOOGLE SATELLITE
-  # ------------------------------------------------------------
-  # This is the real map you want.
-  #
-  # HOW IT WORKS:
   #   • You set your API key locally via:
   #       Sys.setenv(GOOGLE_MAPS_API_KEY = “yourkey”)
   #   • Leaflet embeds the tile URL with your key in the HTML.
   #   • Anyone opening the HTML will see the Google imagery.
-  #
-  # IMPORTANT:
-  #   Do NOT commit the knitted HTML to GitHub.
-  #
-  # OPTIONAL FALLBACK:
-  #   If no key is found, you *could* use Esri Imagery,
-  #   but here we keep it simple and use Google only.
-  # ============================================================
 
   google_key <- Sys.getenv("GOOGLE_MAPS_API_KEY")
 
@@ -520,18 +421,7 @@ pal_d13 <- colorNumeric(
       zoom = 12
     )
 
-  # ============================================================
   # 6. NUTRIENT OVERLAY LAYERS
-  # ------------------------------------------------------------
-  # WHY?
-  #   Each nutrient gets its own togglable layer so the user can:
-  #     • isolate patterns
-  #     • compare nutrients
-  #     • declutter the visual field
-  #
-  #   Grouping by nutrient allows true “dashboard-like” behavior.
-  # ============================================================
-
   nutrient_vars <- c("PO4","SiO2","NO3","NH4")
   nutrient_cols <- c("PO4_col","SiO2_col","NO3_col","NH4_col")
 
@@ -550,21 +440,7 @@ pal_d13 <- colorNumeric(
       )
   }
 
-  # ============================================================
   # 7. ISOTOPE LAYERS
-  # ------------------------------------------------------------
-  # WHY δ15N and δ13C?
-  #   These reflect *integrated* nutrient conditions over time,
-  #   complementing short-term water-column nutrient snapshots.
-  #
-  #   δ15N is often elevated in groundwater/terrestrial nitrogen.
-  #   δ13C reflects carbon sourcing and metabolic context.
-  #
-  #   Plotting them spatially shows:
-  #     • how long-term signals align with seep gradients
-  #     • how isotopes differ from instantaneous water chemistry
-  # ============================================================
-
   m <- m %>%
     addCircleMarkers(
       lng = ~lng, lat = ~lat,
@@ -581,18 +457,7 @@ pal_d13 <- colorNumeric(
       popup = ~popup_fun(df_season)
     )
 
-  # ============================================================
   # 8. LABELS FOR EACH SAMPLING SITE
-  # ------------------------------------------------------------
-  # WHY?
-  #   Helps orient the viewer:
-  #     • Which sites are seeps?
-  #     • Which are downstream?
-  #     • Where are Cabral vs Varari?
-  #
-  #   Labels are toggleable to reduce clutter.
-  # ============================================================
-
   site_coords <- df_season %>%
     select(CowTagID, lat, lng) %>% distinct()
 
@@ -607,17 +472,7 @@ pal_d13 <- colorNumeric(
       group = "Sites"
     )
 
-  # ============================================================
   # 9. LAYER CONTROL
-  # ------------------------------------------------------------
-  # WHY?
-  #   This is what makes the map usable during your talk.
-  #   You can toggle:
-  #     • PO4 / SiO2 / Nitrite / NH4
-  #     • δ15N / δ13C
-  #     • Site labels
-  # ============================================================
-
   m <- m %>%
     addLayersControl(
       overlayGroups = c(nutrient_vars, "δ15N", "δ13C", "Sites"),
@@ -625,28 +480,12 @@ pal_d13 <- colorNumeric(
     ) %>%
     hideGroup(c(nutrient_vars, "δ15N", "δ13C"))
 
-  # ============================================================
   # 10. LEGENDS
-  # ------------------------------------------------------------
-  # WHY?
   #   Legends connect the map’s color scales back to actual values.
   #   Without them, the map looks pretty but isn’t quantitative.
-  # ============================================================
-
-# ============================================================
-# LEGENDS — UPDATED FOR CORRECT COLOR + VALUE ORDERING
-# ------------------------------------------------------------
-# δ15N:
-#   Light yellow → low δ15N
-#   Dark red → high δ15N
-#
-# δ13C:
-#   Light color (top) → less negative (≈ -8‰)
-#   Dark color (bottom) → more negative (≈ -16‰)
-# ============================================================
 
 m <- m %>%
-  # ---- Nutrient Legend (unchanged) ----
+  # Nutrients
   addLegend(
     position = "bottomleft",
     pal     = pal_nut,
@@ -654,7 +493,7 @@ m <- m %>%
     title   = "Nutrients (µmol/L)",
   ) %>%
 
-  # ---- δ15N Legend ----
+  # δ15N 
   addLegend(
     position = "bottomright",
     pal     = pal_d15,
@@ -663,7 +502,7 @@ m <- m %>%
     opacity = 1,
   ) %>%
 
-  # δ13C legend 
+  # δ13C 
 addLegend(
   position = "bottomleft",
   pal     = pal_d13,
@@ -691,7 +530,7 @@ March_map3
 August_map3
 ```
 
-## I'm the other more complicated map that was a super cool idea but didn't work in the end :,(
+#### I'm the other more complicated map that was a super cool idea but didn't work in the end :,(
 
 ```{r}
 make_sgd_map <- function(
@@ -748,8 +587,6 @@ make_sgd_map <- function(
   pal_d15  <- colorNumeric(rev(brewer.pal(9,"YlOrRd")), domain = d15_domain, na.color="transparent")
   pal_d13  <- colorNumeric(brewer.pal(9,"Blues"), domain = d13_domain, na.color="transparent")
 
-  # 5) Precompute color columns (hex strings) inside df_collapse
-  #    This avoids evaluating bare symbols in palette calls later
   df_collapse <- df_collapse %>%
     mutate(
       Nitrite_col   = pal_nut(Nitrite_umolL),
@@ -757,8 +594,7 @@ make_sgd_map <- function(
       Phosphate_col = pal_nut(Phosphate_umolL),
       Silicate_col  = pal_nut(Silicate_umolL),
       del15N_col    = pal_d15(del15N),
-      # if del13C doesn't exist or is all-NA, pal_d13 will return NA; handle gracefully
-      del13C_col    = if ("del13C" %in% names(df_collapse)) pal_d13(df_collapse$del13C) else NA_character_
+      del13C_col    = pal_d13(del13C)
     )
 
   # 6) Popup formatting
