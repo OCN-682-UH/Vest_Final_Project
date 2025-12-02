@@ -30,9 +30,9 @@ The dashboard includes interactive Leaflet maps showing nutrient and isotope gra
 
 ```r
 Sys.setenv(GOOGLE_MAPS_API_KEY = "YOUR_KEY_HERE")
-``'
+```
 
-## **Acknowledgments**
+**Acknowledgments**
 
 Data collected by the Silbiger Lab and Mo‘orea LTER program. Analysis and visualization completed as part of OCN 682 (UH Mānoa).
 
